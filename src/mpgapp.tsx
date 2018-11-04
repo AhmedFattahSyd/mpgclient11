@@ -160,6 +160,7 @@ class MpgApp extends React.Component<IAppProps,IAppState> {
   // menuPage
   ///////////////////////////////////////////////////////////////////////////////////////////////
   menuPage = () => {
+    
     return(
       <div style={{display: 'flex', justifyContent:'space-around', padding:10,
         flexWrap: 'wrap'}}>
