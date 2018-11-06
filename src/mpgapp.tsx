@@ -15,7 +15,7 @@ import Icon from '@material-ui/core/Icon';
 import {List, ListItem, ListItemText} from '@material-ui/core'
 import {Card, CardContent, CardActionArea} from '@material-ui/core'
 // import {Button} from '@material-ui/core'
-// import {Item} from './item'
+import {MpgItemType} from './mpgitem'
 // import {IconButton} from '@material-ui/core'
 import {TextField} from '@material-ui/core'
 import MpgData from './mpgdata'
@@ -94,7 +94,7 @@ interface IAppState {
   newItemName: string,
   appErrorStatus: boolean,
   currentPage: CurrentPage,
-  menuSelection: MenuSelection,
+  currentMenuSelection: MenuSelection,
   data: MpgData,
   selectedItemId: number, //is it possible thta the selected index can be undefined? investigate
   itemPriority: number,
@@ -138,7 +138,7 @@ class MpgApp extends React.Component<IAppProps,IAppState> {
       newItemName: "New item name",
       appErrorStatus: false,
       currentPage: CurrentPage.home,
-      menuSelection: MenuSelection.values,
+      currentMenuSelection: MenuSelection.values,
       data: new MpgData(),
       selectedItemId: -1,
       itemPriority: 1,
@@ -175,10 +175,23 @@ class MpgApp extends React.Component<IAppProps,IAppState> {
       }
     }
   ///////////////////////////////////////////////////////////////////////////////////////////////
+  // get current item type
+  ///////////////////////////////////////////////////////////////////////////////////////////////
+  private getCurrentItemType = (): MpgItemType => {
+    switch (this.state.currentMenuSelection){
+      case MenuSelection.values:
+        return MpgItemType.coreVlaue
+      case MenuSelection.goals:
+        return MpgItemType.goal
+      default:
+        return MpgItemType.item
+    }
+  }   
+  ///////////////////////////////////////////////////////////////////////////////////////////////
   // handle core value click
   ///////////////////////////////////////////////////////////////////////////////////////////////
   handleCoreValueClick = () => {
-    this.setState({menuSelection: MenuSelection.values})
+    this.setState({currentMenuSelection: MenuSelection.values})
     this.setState({currentPage: CurrentPage.list})
   }
   ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -231,20 +244,20 @@ class MpgApp extends React.Component<IAppProps,IAppState> {
   // hanndle save buttom
   ///////////////////////////////////////////////////////////////////////////////////////////////
   handleSave = () => {
+    let itemType = this.getCurrentItemType()
     switch (this.state.editAction){
       case EditAction.create:
         // add new item
         // this should be delegated to mpgData
         //this.state.data.items.push(new Item(-1, this.state.newItemName, this.state.itemPriority))
-        this.state.data.createItem(this.state.newItemName, this.state.itemPriority)
+        this.state.data.createItem(itemType, this.state.newItemName, this.state.itemPriority)
         this.state.data.saveData(this.dataHasBeenSaved)
         break
 
       case EditAction.edit:
         console.log("Saving updates. idex, name and pri:",this.state.selectedItemId, this.state.newItemName,
         this.state.itemPriority)
-        
-        this.state.data.updateItem(this.state.selectedItemId, this.state.newItemName,
+        this.state.data.updateItem(this.state.selectedItemId, itemType, this.state.newItemName,
           this.state.itemPriority)
         this.state.data.saveData(this.dataHasBeenSaved)
         break
@@ -279,6 +292,7 @@ class MpgApp extends React.Component<IAppProps,IAppState> {
   ///////////////////////////////////////////////////////////////////////////////////////////////
   listPage = () => {
     const {classes} = this.props as IAppProps
+    let itemType = this.getCurrentItemType()
     return(
       <div>
          <AppBar position="fixed" className={classes.appBar}>
@@ -296,7 +310,7 @@ class MpgApp extends React.Component<IAppProps,IAppState> {
         </AppBar>
         <div>
           <List style={{paddingTop:60}}>
-            {this.state.data.items.map((item)=>(
+            {this.state.data.getItemsWithType(itemType).map((item)=>(
               <ListItem button key = {item.getId()} className={classes.item}
                 selected={this.state.selectedItemId === item.getId()}
                 onClick={() => this.setState({selectedItemId: item.getId()})}>
@@ -347,7 +361,7 @@ class MpgApp extends React.Component<IAppProps,IAppState> {
   // get current selection in a string (to be used in titles, etc)
   ///////////////////////////////////////////////////////////////////////////////////////////////
   getCurrentSelectionText = () => {
-    switch (this.state.menuSelection){
+    switch (this.state.currentMenuSelection){
       case MenuSelection.values:
         return "Core Value"
       default:

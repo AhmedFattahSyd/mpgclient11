@@ -1,7 +1,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Mpg Data class that deals with all things data           
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
-import {MpgItem, IItemData} from "./item"
+import {MpgItem, IItemData, MpgItemType} from "./mpgitem"
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 // All items json object
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -13,42 +13,94 @@ export interface IItems {
 // defines all functions that interact with the graph data
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 export default class MpgData {
-    items: MpgItem[] = []
+    private items: MpgItem[] = []
+    // should we clreatre different arrays for different types? investigate
     appStateMsg: string 
     dataLoaded: boolean
     sumOfSiblingsPri: number = 0
+    // sumOfSiblingsPri: number[]
     constructor(){
         this.items = []
-        this.appStateMsg = "No state has beebn set"
+        // this.appStateMsg = "No state has beebn set" //tdo: remove
         this.dataLoaded = false
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Add item 
+    // shoul use createItem
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
-    addItem = (name: string, id: number=-1) =>{
-        const item = new MpgItem(id, name)
-        this.items.push(item)
+    // addItem = (name: string, id: number=-1) =>{
+    //     const item = new MpgItem(id, name)
+    //     this.items.push(item)
+    // }
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // getMpgItemType
+    // maps from the string of type type enum
+    // todo: should consider a better implementation with dictionary with symbols keys
+    // todo: consider moving to MpgItem class
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    getMpgItemType = (typeString: string): MpgItemType =>{
+        switch (typeString){
+            case 'item':
+                return MpgItemType.item
+            case 'corevalue':
+                return MpgItemType.coreVlaue
+            case 'goal':
+                return MpgItemType.goal
+            case 'project':
+                return MpgItemType.project
+            case 'task':
+                return MpgItemType.task
+            default:
+                console.log("MpgData:ggetMpgItemType: unknow item type string",typeString);
+                return MpgItemType.coreVlaue
+        }
+    }
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // get item type as a string
+    // todo: consider a better implementation
+    // todo: consider moving to item
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    getItemTypeString = (typeEnum: MpgItemType): string =>{
+        switch (typeEnum){
+            case MpgItemType.item:
+                return 'item'
+            case MpgItemType.coreVlaue:
+                return 'corevalue'
+            case MpgItemType.goal:
+                return 'goal'
+            case MpgItemType.project:
+                return 'project'
+            case MpgItemType.task:
+                return 'task'
+            default:
+                console.log("MpgData:getItemTypeString: unknow MpgItemType",typeEnum);
+                return 'item'
+        }
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Set Items
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
-    setItems(fetchedItems: IItems){
+    private setItems(fetchedItems: IItems){
         let itemsData: IItemData[] = fetchedItems.items
         let items: MpgItem[] = []
         itemsData.map(itemsData => {
-          items.push(new MpgItem(itemsData.id, itemsData.name, itemsData.priority))
+            let newItemType = this.getMpgItemType(itemsData.type)
+            //todo: investigate: should use create item
+            items.push(new MpgItem(itemsData.id, newItemType, itemsData.name, itemsData.priority))
         })
         this.items = items
       }    
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Save data
+    // todo: inv=estigate if we need the dataHasBeenSaved function
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     saveData = (dataHasBeenSavedFun: Function) => {
         // create items data
         let itemsData: IItemData[] = []
         let itemData: IItemData
         for(let item of this.items){
-            itemData = {id: item.getId(), name: item.getName(), priority: item.getPriority()}
+            let itemTypeString = this.getItemTypeString(item.getType())
+            itemData = {id: item.getId(), type: itemTypeString, name: item.getName(), priority: item.getPriority()}
             itemsData.push(itemData)
         }
         let allItems: IItems = {items: itemsData}
@@ -74,9 +126,21 @@ export default class MpgData {
         .then(items => {
             this.setItems(items)
             this.dataLoaded = true
-            this.updateSumOfSiblingPri()
+            this.updateAllSumOfSiblingPri()
             dataHasBeenLoadedFun()})
         .catch((reason: any)=>{console.log("reason:",reason)})
+    }
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // getItems of type
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    getItemsWithType = (typeRequired: MpgItemType): MpgItem[] => {
+        let foundItems: MpgItem[] = []
+        for(let item of this.items){
+            if(item.getType() == typeRequired){
+                foundItems.push(item)
+            }
+        }
+        return foundItems
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     // delete item
@@ -89,7 +153,7 @@ export default class MpgData {
         } else {
             console.log("MpgData:deleteItem: item not found with id:",idParam)  // todo: need a better way to report and handle app errors  
         }
-        this.updateSumOfSiblingPri()
+        this.updateAllSumOfSiblingPri()
         //we need to do much better than this
         //concerns: you shouldn't delete item of an array inside forEach
         // this.items.forEach((item, index) => {
@@ -137,7 +201,7 @@ export default class MpgData {
                 item.setPriority(item.getPriority() + 1)
             }
         },this)
-        this.updateSumOfSiblingPri()
+        this.updateAllSumOfSiblingPri()
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     // decrease priority
@@ -150,18 +214,19 @@ export default class MpgData {
                 }
             }
         },this)
-        this.updateSumOfSiblingPri()
+        this.updateAllSumOfSiblingPri()
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     // update item
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
-    updateItem = (id: number, newName: string, newPriroity: number) => {
+    updateItem = (id: number, newType: MpgItemType, newName: string, newPriroity: number) => {
         const foundItem = this.getItem(id)
         if(foundItem != undefined){
             const item = foundItem as MpgItem
+            item.setType(newType)
             item.setName(newName)
             item.setPriority(newPriroity)
-            this.updateSumOfSiblingPri()
+            this.updateAllSumOfSiblingPri()
         }else{
             console.log("Item not found with id: ",id) // todo: need a standard way to report and record errors of this nature
         }
@@ -169,13 +234,32 @@ export default class MpgData {
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     // update sum of siblings pri
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
-    updateSumOfSiblingPri = () => {
-        this.sumOfSiblingsPri = 0
+    private updateSumOfSiblingPri = (type: MpgItemType): number => {
+        let sumOfSiblingsPri = 0
         for(let item of this.items){
-            this.sumOfSiblingsPri += item.getPriority()
+            if(item.getType() == type){
+             sumOfSiblingsPri += item.getPriority()
+            }
         }
+        return sumOfSiblingsPri
         // now sort them
-        this.items = this.items.sort((item1, item2) => {return (item2.getPriority() - item1.getPriority())})
+        // this.items = this.items.sort((item1, item2) => {return (item2.getPriority() - item1.getPriority())})
+    }
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // update all sum of sibling pri
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    private updateAllSumOfSiblingPri = () : void => {
+        // the following does noit work because what is returned is string not enum
+        // for(let type in MpgItemType){
+        //     this.updateSumOfSiblingPri(type)
+        // }
+        // let's do it in any way we can then improve
+        // todo: improve
+        let sum = this.updateSumOfSiblingPri(MpgItemType.coreVlaue)
+        this.sumOfSiblingsPri[0] = sum
+
+        // tasks have to be handled differently at project level     
+        //this.updateSumOfSiblingPri(MpgItemType.task)
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     // get sum of siblings pri
@@ -186,9 +270,9 @@ export default class MpgData {
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     // create item
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
-    createItem = (name: string, pri: number): void => {
-        const newItem = new MpgItem(-1, name, pri)
+    createItem = (type: MpgItemType, name: string, pri: number): void => {
+        const newItem = new MpgItem(-1, type, name, pri)
         this.items.push(newItem)
-        this.updateSumOfSiblingPri()
+        this.updateAllSumOfSiblingPri()
     }
 }
